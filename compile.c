@@ -563,15 +563,6 @@ APPEND_ELEM(ISEQ_ARG_DECLARE LINK_ANCHOR *const anchor, LINK_ELEMENT *before, LI
 #endif
 
 static int
-iseq_add_mark_object(const rb_iseq_t *iseq, VALUE v)
-{
-    if (!SPECIAL_CONST_P(v)) {
-	rb_iseq_add_mark_object(iseq, v);
-    }
-    return COMPILE_OK;
-}
-
-static int
 iseq_add_mark_object_compile_time(const rb_iseq_t *iseq, VALUE v)
 {
     if (!SPECIAL_CONST_P(v)) {
@@ -1235,7 +1226,7 @@ new_child_iseq(rb_iseq_t *iseq, const NODE *const node,
 				    rb_iseq_path(iseq), rb_iseq_realpath(iseq),
 				    INT2FIX(line_no), parent, type, ISEQ_COMPILE_DATA(iseq)->option);
     debugs("[new_child_iseq]< ---------------------------------------\n");
-    iseq_add_mark_object(iseq, (VALUE)ret_iseq);
+    iseq_add_mark_object_compile_time(iseq, (VALUE)ret_iseq);
     return ret_iseq;
 }
 
@@ -1250,7 +1241,7 @@ new_child_iseq_ifunc(rb_iseq_t *iseq, const struct vm_ifunc *ifunc,
 				 rb_iseq_path(iseq), rb_iseq_realpath(iseq),
 				 INT2FIX(line_no), parent, type, ISEQ_COMPILE_DATA(iseq)->option);
     debugs("[new_child_iseq_ifunc]< ---------------------------------------\n");
-    iseq_add_mark_object(iseq, (VALUE)ret_iseq);
+    iseq_add_mark_object_compile_time(iseq, (VALUE)ret_iseq);
     return ret_iseq;
 }
 
@@ -1501,7 +1492,6 @@ iseq_set_arguments_keywords(rb_iseq_t *iseq, LINK_ANCHOR *const optargs,
 	    switch (nd_type(val_node)) {
 	      case NODE_LIT:
 		dv = val_node->nd_lit;
-		iseq_add_mark_object(iseq, dv);
 		break;
 	      case NODE_NIL:
 		dv = Qnil;
@@ -2044,7 +2034,6 @@ iseq_set_sequence(rb_iseq_t *iseq, LINK_ANCHOR *const anchor)
 			    VALUE v = operands[j];
 			    generated_iseq[code_index + 1 + j] = v;
 			    /* to mark ruby object */
-			    iseq_add_mark_object(iseq, v);
 			    break;
 			}
 		      case TS_IC: /* inline cache */
@@ -4785,7 +4774,6 @@ compile_case(rb_iseq_t *iseq, LINK_ANCHOR *const ret, const NODE *const orig_nod
     }
 
     if (only_special_literals) {
-	iseq_add_mark_object(iseq, literals);
 
 	ADD_INSN(ret, nd_line(orig_node), dup);
 	ADD_INSN2(ret, nd_line(orig_node), opt_case_dispatch, literals, elselabel);
@@ -7500,7 +7488,6 @@ iseq_build_load_iseq(const rb_iseq_t *iseq, VALUE op)
     }
 
     loaded_iseq = rb_iseqw_to_iseq(iseqw);
-    iseq_add_mark_object(iseq, (VALUE)loaded_iseq);
     return loaded_iseq;
 }
 
@@ -7631,7 +7618,6 @@ iseq_build_from_ary_body(rb_iseq_t *iseq, LINK_ANCHOR *const anchor,
 			break;
 		      case TS_VALUE:
 			argv[j] = op;
-			iseq_add_mark_object(iseq, op);
 			break;
 		      case TS_ISEQ:
 			{
@@ -7678,7 +7664,6 @@ iseq_build_from_ary_body(rb_iseq_t *iseq, LINK_ANCHOR *const anchor,
 			    }
 			    RB_GC_GUARD(op);
 			    argv[j] = map;
-			    rb_iseq_add_mark_object(iseq, map);
 			}
 			break;
 		      case TS_FUNCPTR:
@@ -9280,7 +9265,6 @@ ibf_load_object(const struct ibf_load *load, VALUE object_index)
 
 	    rb_ary_store(load->obj_list, (long)object_index, obj);
 	}
-	iseq_add_mark_object(load->iseq, obj);
 	return obj;
     }
 }
@@ -9465,9 +9449,6 @@ ibf_load_iseq(const struct ibf_load *load, const rb_iseq_t *index_iseq)
 	    ibf_load_iseq_complete(iseq);
 #endif /* !USE_LAZY_LOAD */
 
-	    if (load->iseq) {
-		iseq_add_mark_object(load->iseq, (VALUE)iseq);
-	    }
 	    return iseq;
 	}
     }
