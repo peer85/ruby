@@ -2209,11 +2209,6 @@ iseq_set_exception_table(rb_iseq_t *iseq)
 	    entry->end = label_get_position((LABEL *)(ptr[2] & ~1));
 	    entry->iseq = (rb_iseq_t *)ptr[3];
 
-	    /* register iseq as mark object */
-	    if (entry->iseq != 0) {
-		iseq_add_mark_object(iseq, (VALUE)entry->iseq);
-	    }
-
 	    /* stack depth */
 	    if (ptr[4]) {
 		LABEL *lobj = (LABEL *)(ptr[4] & ~1);

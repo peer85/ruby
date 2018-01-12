@@ -126,7 +126,20 @@ rb_iseq_mark(const rb_iseq_t *iseq)
 	rb_gc_mark(body->location.base_label);
 	rb_gc_mark(body->location.pathobj);
 	RUBY_MARK_UNLESS_NULL((VALUE)body->parent_iseq);
+
+	if (body->catch_table) {
+	    const struct iseq_catch_table *table = body->catch_table;
+	    unsigned int i;
+	    for(i = 0; i < table->size; i++) {
+		const struct iseq_catch_table_entry *entry;
+		entry = &table->entries[i];
+		if (entry->iseq) {
+		    rb_gc_mark((VALUE)entry->iseq);
+		}
+	    }
+	}
     }
+
 
     if (FL_TEST(iseq, ISEQ_NOT_LOADED_YET)) {
 	rb_gc_mark(iseq->aux.loader.obj);
