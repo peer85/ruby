@@ -113,6 +113,76 @@ rb_iseq_free(const rb_iseq_t *iseq)
     RUBY_FREE_LEAVE("iseq");
 }
 
+#if OPT_DIRECT_THREADED_CODE || OPT_CALL_THREADED_CODE
+static int
+rb_vm_insn_addr2insn2(const void *addr) /* cold path */
+{
+    int insn;
+    const void * const *table = rb_vm_get_insns_address_table();
+
+    for (insn = 0; insn < VM_INSTRUCTION_SIZE; insn++) {
+	if (table[insn] == addr) {
+	    return insn;
+	}
+    }
+    rb_bug("rb_vm_insn_addr2insn: invalid insn address: %p", addr);
+}
+#endif
+
+typedef void iseq_value_itr_t(void *ctx, VALUE obj);
+
+static int
+iseq_extract_values(const VALUE *code, size_t pos, iseq_value_itr_t * func, void *data)
+{
+#if OPT_DIRECT_THREADED_CODE || OPT_CALL_THREADED_CODE
+    VALUE insn = rb_vm_insn_addr2insn2((void *)code[pos]);
+#else
+    VALUE insn = code[pos];
+#endif
+    int len = insn_len(insn);
+    int op_no;
+    const char *types = insn_op_types(insn);
+
+    for (op_no = 0; types[op_no]; op_no++) {
+	char type = types[op_no];
+	VALUE op = code[pos + op_no + 1];
+	switch (type) {
+	    case TS_CDHASH:
+	    case TS_ISEQ:
+	    case TS_VALUE:
+		if (!SPECIAL_CONST_P(op)) {
+		    func(data, op);
+		}
+		break;
+	    default:
+		break;
+	}
+    }
+
+    return len;
+}
+
+void
+rb_iseq_each_value(const rb_iseq_t *iseq, iseq_value_itr_t * func, void *data)
+{
+    unsigned int size;
+    const VALUE *code;
+    size_t n;
+
+    size = iseq->body->iseq_size;
+    code = iseq->body->iseq_encoded;
+
+    for (n = 0; n < size;) {
+	n += iseq_extract_values(code, n, func, data);
+    }
+}
+
+static void
+each_insn_value(void *ctx, VALUE obj)
+{
+    return rb_gc_mark(obj);
+}
+
 void
 rb_iseq_mark(const rb_iseq_t *iseq)
 {
@@ -121,6 +191,7 @@ rb_iseq_mark(const rb_iseq_t *iseq)
     if (iseq->body) {
 	const struct rb_iseq_constant_body *body = iseq->body;
 
+	rb_iseq_each_value(iseq, each_insn_value, NULL);
 	RUBY_MARK_UNLESS_NULL(body->mark_ary);
 	rb_gc_mark(body->location.label);
 	rb_gc_mark(body->location.base_label);
