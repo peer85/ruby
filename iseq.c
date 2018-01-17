@@ -115,7 +115,7 @@ rb_iseq_free(const rb_iseq_t *iseq)
 
 #if OPT_DIRECT_THREADED_CODE || OPT_CALL_THREADED_CODE
 static int
-rb_vm_insn_addr2insn2(const void *addr) /* cold path */
+rb_vm_insn_addr2insn2(const void *addr)
 {
     int insn;
     const void * const *table = rb_vm_get_insns_address_table();
@@ -145,15 +145,17 @@ iseq_extract_values(const VALUE *code, size_t pos, iseq_value_itr_t * func, void
 
     for (op_no = 0; types[op_no]; op_no++) {
 	char type = types[op_no];
-	VALUE op = code[pos + op_no + 1];
 	switch (type) {
 	    case TS_CDHASH:
 	    case TS_ISEQ:
 	    case TS_VALUE:
-		if (!SPECIAL_CONST_P(op)) {
-		    func(data, op);
+		{
+		    VALUE op = code[pos + op_no + 1];
+		    if (!SPECIAL_CONST_P(op)) {
+			func(data, op);
+		    }
+		    break;
 		}
-		break;
 	    default:
 		break;
 	}
